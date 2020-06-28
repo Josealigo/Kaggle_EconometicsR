@@ -1,0 +1,261 @@
+---
+title: "UG - IIO - Econometría en R - 2020"
+author: "José Ligorría"
+date: "5/25/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Carga de Documentos 
+
+```{r}
+library(readr)
+
+train_url = "https://storage.googleapis.com/kagglesdsdata/competitions/20914/1215799/train.csv?GoogleAccessId=web-data@kaggle-161607.iam.gserviceaccount.com&Expires=1593541853&Signature=EaHKYm4a6i%2BFmvOWWaJK5qMsiJqf7lZiyjOWCvYnJPpjYMIV3dKUGxMOmxwWEaNhdwcwuPtnS%2B7SMBgUHN%2BKZlOWIUjq1CfvI1cXhDoozldcfgnI4XdxKAjgeqvewzEpyYzW%2B%2F2UMFoXMnsjaeLoJiqwKPwfBncLj48kw2TI1LWNyKRSh790mSgMNiZ6wkM8RVdgwxrO1k6%2FmxhZZEM9i3s%2FykcglUpU5pM6r594DUVdIk1C92bslLjHOGJhWvHgtRaQrSLcx36InEYLwJbkRdM48KFBIz2YgVOFzLOFBQ%2Fzsbpa1AvTuGRdOYNAREKRPRLE5255D%2BXg4ziOglPGxA%3D%3D&response-content-disposition=attachment%3B+filename%3Dtrain.csv"
+test_url = "https://storage.googleapis.com/kagglesdsdata/competitions/20914/1215799/test.csv?GoogleAccessId=web-data@kaggle-161607.iam.gserviceaccount.com&Expires=1593541882&Signature=Rc8dBVWgfkAlz6URIjzsy1XYd0hj63P6gGBfyaV%2FgqNHaU%2FNkK1yn15SM4Po0iML0KyNn1qgdGG%2FPFUt6KtswyhOEoO8zdqVhSWrm0Ozs%2BZ1A2DJsgZPpzrZy0mV96RzVS1dBM4baA9jaE%2FfaDdBiV%2FgcLGLVReH%2Fx2k202WUHXQfEzm5Ocq0DdPNxu4mW%2FOeVTd0HbyX%2BeOgDrKJ%2BOV12DcT%2Fo3FW9DugbLhibrNS%2FmQskFmvJq037r2eqhEVXwOXm4strjHy40liQj%2FakDIAPynRLmyf%2F41JE0F%2Brkp%2FbT1fY4m9%2BsGD5aNcafq9BnQ464gbBtGdNDVXj18YjXHQ%3D%3D&response-content-disposition=attachment%3B+filename%3Dtest.csv"
+
+dest_file_train = paste(getwd(), "/train.csv",sep="")
+dest_file_test = paste(getwd(), "/test.csv",sep="")
+
+download.file(train_url, dest_file_train)
+download.file(test_url, dest_file_test)
+
+train <- read_csv(dest_file_train)
+test <- read_csv(dest_file_test)
+
+dim(train)
+length(which(is.na(train)))
+summary(train)
+```
+
+```{r}
+ocean_proximitys = unique(train$ocean_proximity)
+for (i in ocean_proximitys) {
+  piv = rep(0,nrow(train))
+  piv1 = which(train$ocean_proximity == i)
+  piv[piv1] = 1
+  train = as.data.frame(cbind(train,piv))
+  colnames(train)[ncol(train)] = paste("ocean_proximitys_",i,sep = "")
+}
+```
+
+
+```{r}
+dataset = train[,which(!is.element(colnames(train),c("ocean_proximity","id")))]
+dataset = dataset[,c(which(!is.element(colnames(dataset),c("median_house_value"))),which(is.element(colnames(dataset),c("median_house_value"))))]
+```
+
+```{r}
+for (i in 1:ncol(dataset)) {
+  print(c(i,length(which(is.na(dataset[,i])))))
+}
+```
+
+Dado que son pocos registros vamos a proceder eliminando las filas con valores NA
+ 
+```{r}
+dataset = dataset[complete.cases(dataset),]
+```
+
+
+```{r}
+library(corrplot)
+corrplot(cor(dataset)) 
+```
+
+```{r}
+for (i in 1:ncol(dataset)) {
+  print(length(unique(dataset[,i])))
+}
+
+var_piv = dataset[,4]
+min_piv = min(var_piv)
+max_piv = max(var_piv)
+Rango = max_piv-min_piv
+n = 100
+lims = min_piv + Rango/n * c(0:n)
+frec = NULL
+for(i in 1:n){
+  frec[i] = length(which(var_piv>lims[i] & var_piv<=lims[i+1]))
+}
+lim4 = lims[30]
+dataset[which(var_piv>lim4),4] = rep(lim4,length(which(var_piv>lim4)))
+```
+
+```{r}
+var_piv = dataset[,5]
+min_piv = min(var_piv)
+max_piv = max(var_piv)
+Rango = max_piv-min_piv
+n = 100
+lims = min_piv + Rango/n * c(0:n)
+frec = NULL
+for(i in 1:n){
+  frec[i] = length(which(var_piv>lims[i] & var_piv<=lims[i+1]))
+}
+lim5 = lims[30]
+dataset[which(var_piv>lim5),5] = rep(lim5,length(which(var_piv>lim5)))
+```
+
+```{r}
+var_piv = dataset[,6]
+min_piv = min(var_piv)
+max_piv = max(var_piv)
+Rango = max_piv-min_piv
+n = 100
+lims = min_piv + Rango/n * c(0:n)
+frec = NULL
+for(i in 1:n){
+  frec[i] = length(which(var_piv>lims[i] & var_piv<=lims[i+1]))
+}
+lim6 = lims[20]
+dataset[which(var_piv>lim6),6] = rep(lim6,length(which(var_piv>lim6)))
+```
+
+```{r}
+var_piv = dataset[,7]
+min_piv = min(var_piv)
+max_piv = max(var_piv)
+Rango = max_piv-min_piv
+n = 100
+lims = min_piv + Rango/n * c(0:n)
+frec = NULL
+for(i in 1:n){
+  frec[i] = length(which(var_piv>lims[i] & var_piv<=lims[i+1]))
+}
+lim7 = lims[30]
+dataset[which(var_piv>lim7),7] = rep(lim7,length(which(var_piv>lim7)))
+```
+
+```{r}
+var_piv = dataset[,8]
+min_piv = min(var_piv)
+max_piv = max(var_piv)
+Rango = max_piv-min_piv
+n = 100
+lims = min_piv + Rango/n * c(0:n)
+frec = NULL
+for(i in 1:n){
+  frec[i] = length(which(var_piv>lims[i] & var_piv<=lims[i+1]))
+}
+lim8 = lims[60]
+dataset[which(var_piv>lim8),8] = rep(lim8,length(which(var_piv>lim8)))
+```
+
+```{r}
+var_piv = dataset[,9]
+table(var_piv)
+var_piv = dataset[,10]
+table(var_piv)
+var_piv = dataset[,11]
+table(var_piv)
+var_piv = dataset[,12]
+table(var_piv)
+var_piv = dataset[,13]
+table(var_piv)
+var_out = colnames(dataset)[13]
+dataset = dataset[,which(!is.element(colnames(dataset),var_out))]
+```
+
+
+
+```{r}
+colnames(dataset) = gsub(" ", "_", colnames(dataset))
+colnames(dataset) = gsub("<", "", colnames(dataset))
+dataset_s = dataset
+for(i in 1:(ncol(dataset_s)-1)){
+  dataset_s[,i] = (dataset_s[,i]-mean(dataset[,i]))/ sd(dataset[,i])
+}
+```
+
+```{r}
+set.seed(1)
+sub1 = sample(1:nrow(dataset_s),ceiling(nrow(dataset_s)*0.64))
+set.seed(1)
+sub2 = sample(setdiff(1:nrow(dataset_s),sub1),ceiling(nrow(dataset_s)*0.16))
+sub3 = setdiff(1:nrow(dataset_s),union(sub1,sub2))
+
+tcy = dataset_s[sub1,]
+vcy = dataset_s[sub2,]
+ttcy = dataset_s[sub3,]
+```
+
+
+
+```{r}
+#ocean_proximitys = unique(test$ocean_proximity)
+for (i in ocean_proximitys) {
+  piv = rep(0,nrow(test))
+  piv1 = which(test$ocean_proximity == i)
+  piv[piv1] = 1
+  test = as.data.frame(cbind(test,piv))
+  colnames(test)[ncol(test)] = paste("ocean_proximitys_",i,sep = "")
+}
+dataset_f = test[,which(!is.element(colnames(test),c("ocean_proximity","id")))]
+dataset_f = dataset_f[,c(which(!is.element(colnames(dataset_f),c("median_house_value"))),which(is.element(colnames(dataset_f),c("median_house_value"))))]
+#dataset_f = dataset_f[complete.cases(dataset_f),]
+
+var_piv = dataset_f[,4]
+dataset_f[which(var_piv>lim4),4] = rep(lim4,length(which(var_piv>lim4)))
+var_piv = dataset_f[,5]
+dataset_f[which(var_piv>lim5),5] = rep(lim5,length(which(var_piv>lim5)))
+var_piv = dataset_f[,6]
+dataset_f[which(var_piv>lim6),6] = rep(lim6,length(which(var_piv>lim6)))
+var_piv = dataset_f[,7]
+dataset_f[which(var_piv>lim7),7] = rep(lim7,length(which(var_piv>lim7)))
+var_piv = dataset_f[,8]
+dataset_f[which(var_piv>lim8),8] = rep(lim8,length(which(var_piv>lim8)))
+var_out = colnames(dataset_f)[13]
+dataset_f = dataset_f[,which(!is.element(colnames(dataset_f),var_out))]
+
+colnames(dataset_f) = gsub(" ", "_", colnames(dataset_f))
+colnames(dataset_f) = gsub("<", "", colnames(dataset_f))
+dataset_f_s = dataset_f
+
+
+for(i in 1:(ncol(dataset_f_s)-1)){
+  dataset_f_s[,i] = (dataset_f_s[,i]-mean(dataset[,i]))/ sd(dataset[,i])
+}
+```
+
+```{r}
+ library(dplyr)
+
+dataset_trim <- dataset %>%
+  mutate(roomsperhouse = total_rooms/households, 
+         bedroomsperhouse = total_bedrooms/households, 
+         popperhouse = population/households)
+dataset_trim <- dataset_trim %>% 
+  mutate(bedroomstoroomsratio = bedroomsperhouse/roomsperhouse)
+dataset_trim = dataset_trim[,c(which(!is.element(colnames(dataset_trim),c("median_house_value"))),which(is.element(colnames(dataset_trim),c("median_house_value"))))]
+
+dataset_trim_s = dataset_trim
+for(i in 1:(ncol(dataset_trim_s)-1)){
+  dataset_trim_s[,i] = (dataset_trim_s[,i]-mean(dataset_trim[,i]))/ sd(dataset_trim[,i])
+}
+set.seed(1)
+sub1 = sample(1:nrow(dataset_trim_s),ceiling(nrow(dataset_trim_s)*0.64))
+set.seed(1)
+sub2 = sample(setdiff(1:nrow(dataset_trim_s),sub1),ceiling(nrow(dataset_trim_s)*0.16))
+sub3 = setdiff(1:nrow(dataset_trim_s),union(sub1,sub2))
+
+tcy = dataset_trim_s[sub1,]
+vcy = dataset_trim_s[sub2,]
+ttcy = dataset_trim_s[sub3,]
+
+dataset_f_trim <- dataset_f %>%
+  mutate(roomsperhouse = total_rooms/households, 
+         bedroomsperhouse = total_bedrooms/households, 
+         popperhouse = population/households)
+dataset_f_trim <- dataset_f_trim %>% 
+  mutate(bedroomstoroomsratio = bedroomsperhouse/roomsperhouse)
+dataset_f_trim = dataset_f_trim[,c(which(!is.element(colnames(dataset_f_trim),c("median_house_value"))),which(is.element(colnames(dataset_f_trim),c("median_house_value"))))]
+dataset_f_trim_s = dataset_f_trim
+for(i in 1:(ncol(dataset_f_trim_s)-1)){
+  dataset_f_trim_s[,i] = (dataset_f_trim_s[,i]-mean(dataset_trim[,i]))/ sd(dataset_trim[,i])
+}
+```
+

@@ -1,0 +1,141 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+load_pack_piv = library(xgboost,logical.return = T)
+if(load_pack_piv==FALSE){install.packages("xgboost");library(xgboost,logical.return = T)}
+
+learning_rate = c(0.01,0.03,0.05,0.1)
+depth = c(6,10)
+leaf_estimation_iterations = c(1:10)
+rsm = c(0.6,0.7,0.8,0.9,1)
+
+parms_cb = expand.grid("learning_rate"=learning_rate,"depth"=depth,"leaf_estimation_iterations"=leaf_estimation_iterations,"rsm"=rsm)
+
+```
+
+
+```{r}
+
+dtrain = catboost.load_pool(data = as.matrix(tcy[,which(!is.element(colnames(tcy),c("median_house_value")))]), label = tcy$median_house_value)
+dval = catboost.load_pool(data = as.matrix(vcy[,which(!is.element(colnames(vcy),c("median_house_value")))]), label = vcy$median_house_value)
+dtest = catboost.load_pool(data = as.matrix(ttcy[,which(!is.element(colnames(ttcy),c("median_house_value")))]), label = ttcy$median_house_value)
+dtotal = catboost.load_pool(data = as.matrix(dataset_s[,which(!is.element(colnames(dataset_s),c("median_house_value")))]), label = dataset_s$median_house_value)
+
+  out = c()
+  for (i in 1:ncol(dataset_f_s)) {
+    if(length(which(is.na(dataset_f_s[,i])))>0) out =c(out,i)
+  }
+  
+  for (i in out) {
+    median_value = median(dataset_s[,i])
+    dataset_f_s[which(is.na(dataset_f_s[,i])),i] = median_value
+  }
+
+dataset_f_s$median_house_value = 0
+dtest_f =  catboost.load_pool(data = as.matrix(dataset_f_s[,which(!is.element(colnames(dataset_f_s),c("median_house_value")))]), label = dataset_f_s$median_house_value)
+
+parms <- list(iterations=500,
+  learning_rate=0.01,
+  depth=10,
+  loss_function='RMSE',
+  eval_metric='RMSE',
+  leaf_estimation_iterations = 3,
+  random_seed = 55,
+  od_type='Iter',
+  metric_period = 50,
+  od_wait=20,
+  use_best_model=TRUE,
+  rsm = 0.9,
+  logging_level="Silent"
+  )
+
+model = catboost.train(learn_pool = dtrain,test_pool = dval,params = parms)
+y_pred = catboost.predict(model,dval)
+postResample(y_pred,vcy$median_house_value)
+
+
+```
+
+
+```{r}
+
+Resultados = NULL 
+
+ptm = proc.time()
+conjunto_iterador =parms_cb
+for (i in 1:nrow(conjunto_iterador)) {
+  ptm_inicial = proc.time()
+  parms = list(learning_rate = parms_cb$learning_rate[i], depth = parms_cb$depth[i], leaf_estimation_iterations = parms_cb$leaf_estimation_iterations[i], rsm = parms_cb$rsm[i], logging_level="Silent")
+
+  set.seed(1)
+  cat_piv = catboost.train(learn_pool = dtrain,test_pool = dval,params = parms)
+  #print("Creada el rf")
+  pred = catboost.predict(cat_piv,dval)
+  #print("Pasamos pred")
+  Resultados_piv = data.frame(cbind("Method" = c("xgb"),"ID_Parm" = c(i),"RMSE"=mean((vcy$median_house_value - pred)**2)**0.5,"Tiempo" = (proc.time() - ptm_inicial)[3]),stringsAsFactors=F)
+  #print("a")
+  rownames(Resultados_piv) = i
+  #print("b")
+  Resultados = rbind(Resultados,Resultados_piv)
+  #print("c")
+  
+  if(i %% floor(nrow(conjunto_iterador)/20) ==0)
+  print(c(i,i/nrow(conjunto_iterador),"RMSE: ",Resultados_piv$RMSE,"  min RMSE: ",min(as.numeric(Resultados$RMSE)),"  Tiempo: ",Resultados_piv$Tiempo, "  Aproximado restante: ",(nrow(conjunto_iterador)-i)*mean(as.numeric(Resultados$Tiempo))  ))
+  
+}
+(proc.time() - ptm)[3]
+
+save.image("C:/Users/jose-/Documents/Maestria/Econometria_R/Proyecto/Kaggle_EconometicsR/Envs/cat_1.RData")
+
+```
+
+```{r}
+best_parm = which.min(as.numeric(Resultados$RMSE))
+parms = list(learning_rate = parms_cb$learning_rate[best_parm], depth = parms_cb$depth[best_parm], leaf_estimation_iterations = parms_cb$leaf_estimation_iterations[best_parm], rsm = parms_cb$rsm[best_parm], logging_level="Silent")
+  set.seed(1)
+  cat_final = catboost.train(learn_pool = dtrain,test_pool = dval,params = parms)
+  
+  pred_vcy = catboost.predict(cat_final,dval)
+  RMSE_vcy = mean((vcy$median_house_value - pred_vcy)**2)**0.5
+  
+  pred_ttcy = catboost.predict(cat_final,dtest)
+  RMSE_ttcy = mean((ttcy$median_house_value - pred_ttcy)**2)**0.5
+  
+  pred_f = catboost.predict(cat_final,dtest_f)
+  submission3 = as.data.frame(cbind("id"=test$id,"median_house_value"=pred_f))
+  
+  
+  length(pred_f) # 6129    
+  dim(test) # 6193   
+  colnames(submission3) = c("id"	,"median_house_value")
+
+  write.csv(submission3,"C:/Users/jose-/Documents/Maestria/Econometria_R/Proyecto/Kaggle_EconometicsR/submission3_20200627.csv",row.names = F)
+  
+  set.seed(1)
+  cat_final_total = catboost.train(learn_pool = dtotal,test_pool = dval,params = parms)
+  pred_f_total = catboost.predict(cat_final_total,dtest_f)
+  submission8= as.data.frame(cbind("id"=test$id,"median_house_value"=pred_f_total))
+  colnames(submission8) = c("id"	,"median_house_value")
+  write.csv(submission8,"C:/Users/jose-/Documents/Maestria/Econometria_R/Proyecto/Kaggle_EconometicsR/submission8_20200627.csv",row.names = F)
+  
+save.image("C:/Users/jose-/Documents/Maestria/Econometria_R/Proyecto/Kaggle_EconometicsR/Envs/cat_1.RData")
+  
+```
+
+
+```{r}
+FI = catboost.get_feature_importance(cat_final_total,
+                       dtotal)
+rownames(FI) = colnames(dataset_s)[1:12]
+FI = as.data.frame(FI[order(FI[,1]),])
+colnames(FI)[1] = "Importance"
+
+
+save.image("C:/Users/jose-/Documents/Maestria/Econometria_R/Proyecto/Kaggle_EconometicsR/Envs/cat_1.RData")
+```
+
+
+

@@ -1,0 +1,42 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+load_pack_piv = library(e1071,logical.return = T)
+if(load_pack_piv==FALSE){install.packages("e1071");library(e1071,logical.return = T)}
+
+gamma = 10**c(-3:3)
+kernel = c("linear","polynomial","radial","sigmoid")
+cost = 10**c(-3:3)
+type = c("eps-regression")
+
+parms_sv = expand.grid("gamma"=gamma,"kernel"=kernel,"cost"=cost,"type"=type)
+pams_out = which(parms_sv$kernel=="linear" & parms_sv$gamma != 1)
+pams_in = setdiff(1:nrow(parms_sv),pams_out)
+parms_sv = parms_sv[pams_in,]
+
+
+```
+
+```{r}
+Resultados = NULL 
+
+conjunto_iterador = parms_sv
+ptm = proc.time()
+for (i in 1:nrow(conjunto_iterador)) {
+  ptm_inicial = proc.time()
+  set.seed(1)
+  svm_piv = svm(median_house_value~.,tcy[1:100,],cachesize = 1500,gamma = conjunto_iterador$gamma[i],kernel = conjunto_iterador$kernel[i], cost = conjunto_iterador$cost[i], type = conjunto_iterador$type[i])
+  pred = predict(svm_piv,vcy)
+  Resultados_piv = data.frame(cbind("Method" = c("SVM"),"ID_Parm" = c(i),"RMSE"=mean((vcy$median_house_value - pred)**2)**0.5,"Tiempo" = (proc.time() - ptm_inicial)[3]),stringsAsFactors=F)
+  rownames(Resultados_piv) = i
+  Resultados = rbind(Resultados,Resultados_piv)
+  
+  print(c("RMSE: ",Resultados_piv$RMSE,"  min RMSE: ",min(Resultados$RMSE),"  Tiempo: ",Resultados_piv$Tiempo, "  Aproximado restante: ",(nrow(conjunto_iterador)-i)*mean(as.numeric(Resultados$Tiempo))  ))
+  
+  
+}
+(proc.time() - ptm)[3]
+```

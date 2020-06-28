@@ -1,0 +1,86 @@
+---
+title: "Untitled"
+author: "José Ligorría"
+date: "6/24/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+load_pack_piv = library(e1071,logical.return = T)
+if(load_pack_piv==FALSE){install.packages("e1071");library(e1071,logical.return = T)}
+
+gamma = 10**c(-3)
+kernel = c("linear","radial","sigmoid")
+cost = 10**c(-3:2)
+type = c("nu-regression")
+epsion = 10**c(-4:1) 
+nu = seq(0.1,1,by = 0.1)
+
+parms_sv = expand.grid("gamma"=gamma,"kernel"=kernel,"cost"=cost,"type"=type,"epsion"=epsion,"nu"=nu)
+
+pams_out = which(parms_sv$kernel=="linear" & parms_sv$gamma != 1)
+pams_in = setdiff(1:nrow(parms_sv),pams_out)
+parms_sv = parms_sv[pams_in,]
+
+
+```
+
+```{r}
+Resultados = NULL 
+
+conjunto_iterador = parms_sv
+ptm = proc.time()
+for (i in 1:nrow(conjunto_iterador)) {
+  ptm_inicial = proc.time()
+  set.seed(1)
+  svm_piv = svm(median_house_value~.,tcy,scale=T,cachesize = 1500,gamma = conjunto_iterador$gamma[i],kernel = conjunto_iterador$kernel[i], cost = conjunto_iterador$cost[i], type = conjunto_iterador$type[i],epsion=conjunto_iterador$epsion[i],nu=conjunto_iterador$nu[i])
+  pred = predict(svm_piv,vcy)
+  Resultados_piv = data.frame(cbind("Method" = c("SVM"),"ID_Parm" = c(i),"RMSE"=mean((vcy$median_house_value - pred)**2)**0.5,"Tiempo" = (proc.time() - ptm_inicial)[3]),stringsAsFactors=F)
+  rownames(Resultados_piv) = i
+  Resultados = rbind(Resultados,Resultados_piv)
+  
+  print(c("SVM",i,i/nrow(conjunto_iterador),"RMSE: ",Resultados_piv$RMSE,"  min RMSE: ",min(as.numeric(Resultados$RMSE)),"  Tiempo: ",Resultados_piv$Tiempo, "  Aproximado restante: ",(nrow(conjunto_iterador)-i)*mean(as.numeric(Resultados$Tiempo))  ))
+  
+  
+}
+(proc.time() - ptm)[3]
+save.image("C:/Users/jose-/Documents/Maestria/Econometria_R/Proyecto/Kaggle_EconometicsR/Envs/SVM_3.RData")
+```
+
+
+```{r}
+   best_parm = which.min(as.numeric(Resultados$RMSE))
+  set.seed(1)
+  sv_final =  svm(median_house_value~.,tcy,scale=T,cachesize = 1500,gamma = conjunto_iterador$gamma[best_parm],kernel = conjunto_iterador$kernel[best_parm], cost = conjunto_iterador$cost[best_parm], type = conjunto_iterador$type[best_parm],epsion=conjunto_iterador$epsion[best_parm],nu=conjunto_iterador$nu[best_parm])
+  
+  pred_vcy = predict(sv_final,vcy)
+  RMSE_vcy = mean((vcy$median_house_value - pred_vcy)**2)**0.5
+  
+  pred_ttcy = predict(sv_final,ttcy)
+  RMSE_ttcy = mean((ttcy$median_house_value - pred_ttcy)**2)**0.5
+  
+  out = c()
+  for (i in 1:ncol(dataset_f_s)) {
+    if(length(which(is.na(dataset_f_s[,i])))>0) out =c(out,i)
+  }
+  median_value = median(dataset_s[,5])
+  for (i in out) {
+    dataset_f_s[which(is.na(dataset_f_s[,i])),i] = median_value
+  }
+  
+  pred_f = predict(sv_final,dataset_f_s)
+  submission2 = as.data.frame(cbind("id"=test$id,"median_house_value"=pred_f))
+  
+  
+  dim(pred_f) # 6129    
+  dim(test) # 6193   
+  colnames(submission2) = c("id"	,"median_house_value")
+
+  write.csv(submission2,"C:/Users/jose-/Documents/Maestria/Econometria_R/Proyecto/Kaggle_EconometicsR/submission2_20200625.csv",row.names = F)
+```
+
+

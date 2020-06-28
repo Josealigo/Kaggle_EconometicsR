@@ -1,0 +1,44 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+load_pack_piv = library(nnet,logical.return = T)
+if(load_pack_piv==FALSE){install.packages("nnet");library(nnet,logical.return = T)}
+size = 1:ncol(tcy)
+skip = c(TRUE,FALSE)
+maxit = c(100,500)
+
+parms_nnet = expand.grid("size"=size,"skip"=skip,"maxit"=maxit)
+
+
+```
+
+```{r}
+#Resultados = NULL 
+
+conjunto_iterador = parms_nnet
+ptm = proc.time()
+for (i in 1:nrow(conjunto_iterador)) {
+  ptm_inicial = proc.time()
+  max_val = max(dataset_s$median_house_value)
+  set.seed(1)
+  nnet_piv = nnet(median_house_value/max_val~.,tcy[1:100,],size = conjunto_iterador$size[i],skip = conjunto_iterador$skip[i], maxit = conjunto_iterador$maxit[i])
+  #print("Creada la nnet")
+  pred = predict(nnet_piv,vcy)*max_val
+  #print("Pasamos pred")
+  Resultados_piv = data.frame(cbind("Method" = c("NNET"),"ID_Parm" = c(i),"RMSE"=mean((vcy$median_house_value - pred)**2)**0.5,"Tiempo" = (proc.time() - ptm_inicial)[3]),stringsAsFactors=F)
+  #print("a")
+  rownames(Resultados_piv) = i
+  #print("b")
+  Resultados = rbind(Resultados,Resultados_piv)
+  #print("c")
+  
+  print(c("RMSE: ",Resultados_piv$RMSE,"  min RMSE: ",min(Resultados$RMSE),"  Tiempo: ",Resultados_piv$Tiempo, "  Aproximado restante: ",(nrow(conjunto_iterador)-i)*mean(as.numeric(Resultados$Tiempo))  ))
+  
+  
+}
+(proc.time() - ptm)[3]
+```
+

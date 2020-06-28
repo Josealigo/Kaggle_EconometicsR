@@ -1,0 +1,107 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+load_pack_piv = library(xgboost,logical.return = T)
+if(load_pack_piv==FALSE){install.packages("xgboost");library(xgboost,logical.return = T)}
+
+Booster = "gbtree"
+eta = c(0.01,0.05,0.1,0.15,0.2,0.25,0.3)
+gamma = c(0,1,5,10)
+max_depth = c(6,10)
+subsample = 1
+colsample_bytree = 1
+lambda = c(0,0.5,1)
+
+#alpha =
+
+
+parms_xg = expand.grid("Booster"=Booster,"eta"=eta,"gamma"=gamma,"max_depth"=max_depth,"subsample"=subsample,"colsample_bytree"=colsample_bytree,"lambda"=lambda)
+parms_xg$alpha = 1-parms_xg$lambda
+
+```
+
+
+```{r}
+dtrain = xgb.DMatrix(data = as.matrix(tcy[,which(!is.element(colnames(tcy),c("median_house_value")))]),label = tcy$median_house_value) 
+dval = xgb.DMatrix(data = as.matrix(vcy[,which(!is.element(colnames(vcy),c("median_house_value")))]),label = vcy$median_house_value) 
+dtest = xgb.DMatrix(data = as.matrix(ttcy[,which(!is.element(colnames(ttcy),c("median_house_value")))]),label = ttcy$median_house_value)
+
+dataset_f_s$median_house_value = 0
+dtest_f =  xgb.DMatrix(data = as.matrix(dataset_f_s[,which(!is.element(colnames(dataset_f_s),c("median_house_value")))]),label = dataset_f_s$median_house_value)
+
+parms <- list(booster = "gbtree", objective = "reg:squarederror", eta=0.3, gamma=0, max_depth=6, min_child_weight=1, subsample=1, colsample_bytree=1)
+
+xgbcv <- xgb.cv( params = parms, data = dtrain, nrounds = 500, nfold = 5, showsd = T, stratified = T, print.every.n = 10, early.stop.round = 20, maximize = F)
+
+xgb1 <- xgb.train (params = parms, data = dtrain, nrounds = 125, watchlist = list(val=dval,train=dtrain), print.every.n = 10, early.stop.round = 10, maximize = F , eval_metric = "error")
+xgbpred <- predict (xgb1,dval)
+mat <- xgb.importance (feature_names = colnames(tcy),model = xgb1)
+xgb.plot.importance (importance_matrix = mat) 
+```
+
+
+```{r}
+
+Resultados = NULL 
+
+ptm = proc.time()
+conjunto_iterador =parms_xg
+for (i in 1:nrow(conjunto_iterador)) {
+  ptm_inicial = proc.time()
+  parms = list(booster = as.character(parms_xg$Booster[i]), objective = "reg:squarederror", eta = parms_xg$eta[i], gamma=parms_xg$gamma[i], max_depth = parms_xg$max_depth[i], min_child_weight=1,subsample=parms_xg$subsample[i], colsample_bytree = parms_xg$colsample_bytree[i], alpha = parms_xg$alpha[i], lambda = parms_xg$lambda[i])
+
+  set.seed(1)
+  xgb_piv = xgb.train (params = parms, data = dtrain, nrounds = 125, watchlist = list(val=dval,train=dtrain), maximize = F , eval_metric = "error", verbose = 0)
+  #print("Creada el rf")
+  pred = predict(xgb_piv,dval)
+  #print("Pasamos pred")
+  Resultados_piv = data.frame(cbind("Method" = c("xgb"),"ID_Parm" = c(i),"RMSE"=mean((vcy$median_house_value - pred)**2)**0.5,"Tiempo" = (proc.time() - ptm_inicial)[3]),stringsAsFactors=F)
+  #print("a")
+  rownames(Resultados_piv) = i
+  #print("b")
+  Resultados = rbind(Resultados,Resultados_piv)
+  #print("c")
+  
+  if(i %% floor(nrow(conjunto_iterador)/20) ==0)
+  print(c(i,i/nrow(conjunto_iterador),"RMSE: ",Resultados_piv$RMSE,"  min RMSE: ",min(as.numeric(Resultados$RMSE)),"  Tiempo: ",Resultados_piv$Tiempo, "  Aproximado restante: ",(nrow(conjunto_iterador)-i)*mean(as.numeric(Resultados$Tiempo))  ))
+  
+}
+(proc.time() - ptm)[3]
+
+save.image("C:/Users/jose-/Documents/Maestria/Econometria_R/Proyecto/Kaggle_EconometicsR/Envs/xgb_1.RData")
+
+```
+
+```{r}
+best_parm = which.min(as.numeric(Resultados$RMSE))
+parms = list(booster = as.character(parms_xg$Booster[best_parm]), objective = "reg:squarederror", eta = parms_xg$eta[best_parm], gamma=parms_xg$gamma[best_parm], max_depth = parms_xg$max_depth[best_parm], min_child_weight=1,subsample=parms_xg$subsample[best_parm], colsample_bytree = parms_xg$colsample_bytree[best_parm], alpha = parms_xg$alpha[best_parm], lambda = parms_xg$lambda[best_parm])
+  set.seed(1)
+  xgb_final = xgb.train (params = parms, data = dtrain, nrounds = 125, watchlist = list(val=dval,train=dtrain), maximize = F , eval_metric = "error", verbose = 0)
+  
+  pred_vcy = predict(xgb_final,dval)
+  RMSE_vcy = mean((vcy$median_house_value - pred_vcy)**2)**0.5
+  
+  pred_ttcy = predict(xgb_final,dtest)
+  RMSE_ttcy = mean((ttcy$median_house_value - pred_ttcy)**2)**0.5
+  
+ 
+  
+  pred_f = predict(xgb_final,dtest_f)
+  submission1 = as.data.frame(cbind("id"=test$id,"median_house_value"=pred_f))
+  
+  
+  dim(pred_f) # 6129    
+  dim(test) # 6193   
+  colnames(submission1) = c("id"	,"median_house_value")
+
+  write.csv(submission1,"C:/Users/jose-/Documents/Maestria/Econometria_R/Proyecto/Kaggle_EconometicsR/submission1_20200627.csv",row.names = F)
+  
+```
+
+
+
+
+
