@@ -1,0 +1,26 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Como estrategia se realizarán dos experimentos en paralelo para al final juntar los mejores resultados de ambos (provisto que su RMSE sea similar) en un "embedding" de ambos haciendo un promedio ponderado con sus resultados de RMSE en el conjunto de datos "test".
+
+El primer experimento consiste en utilizar el conjunto de datos de entrenamiento sin realizar una adición de campos, solamente eliminación de registros con valores "NA" y realizando para cada variable independiente una búsqueda de valores atípicos y posteriormente amputar esos valores a un límite establecido. Utilizando ese conjunto de datos con el procedimiento descrito se realiza una normalización de cada variable independiente para que tengan una media de 0 y desviación estándar de 1. Una vez con el conjunto de datos limpio y escalado se procede a iniciar el entrenamiento, el cual está separado en las siguientes partes:
+
+- Creación de los conjuntos tcy, vcy y ttcy, que son los conjuntos de entrenamiento, validación y prueba para el entrenamiento respectivamente; lo cual se hace estableciendo una semilla para que el experimento sea reproducible.
+- Utilizar el conjunto tcy para entrenar una lista de modelos, cada uno con un conjunto predefinido de posibles hiperparámetros y buscaremos la configuración de hiperparámetros que al ser usados en el modelo tengan el mejor desempeño en el conjunto vcy.
+- Utilizar el conjunto ttcy para aportar métricas de desempeño de cada tipo de modelo y así permitirnos hacer una estimación de los resultados que obtendremos sobre el conjunto de datos "test" que será evaluado en la competencia.
+- Evaluar el conjunto de datos "test" con cada uno de los mejores modelos por tipo y obtener la métrica otorgada por la competencia.  
+- Guardar tanto el mejor modelo según lo obtenido en la competencia y su ajuste al conjunto de datos "test" para uso posterior.
+
+El segundo experimento constará en utilizar el conjunto de datos de entrenamiento con campos adicionales creados con operaciones aritméticas de los ya conocidos, esto acompañado siempre de imputar valores sobre los valores atípicos por variable independiente y eliminación de registros con valores "NA" como en el experimento 1. Luego ya con el dataset de entrenamiento limpio y sin valores atípicos se procederá como sigue:
+
+- Creación de los conjuntos tcy, vcy y ttcy, que son los conjuntos de entrenamiento, validación y prueba para el entrenamiento respectivamente; lo cual se hace estableciendo una semilla para que el experimento sea reproducible.
+- Utilizar el conjunto tcy para entrenar el modelo ganador del experimento 1, con el conjunto predefinido de posibles hiperparámetros y buscaremos la configuración de hiperparámetros que al ser usados en el modelo tengan el mejor desempeño en el conjunto vcy.
+- Utilizar el conjunto ttcy para aportar métricas de desempeño del modelo y así permitirnos hacer una estimación de los resultados que obtendremos sobre el conjunto de datos "test" que será evaluado en la competencia.
+- Evaluar el conjunto de datos "test" con el mejor modelo generado y obtener la métrica otorgada por la competencia.
+- Guardar tanto el modelo y su ajuste al conjunto de datos "test" para uso posterior. 
+
+Una vez realizados ambos experimentos se compara el RMSE obtenido sobre el conjunto de datos "test" y si no tienen mucha variación se procede como sigue:
+
+- Tomar la data ajustada en ambos experimentes al dataset "test" para la variable "median_house_value" y hacer un promedio ponderado con los pesos 1/[RMSE de la competencia] y así tener una estimación a la variable "median_house_value" que tome lo mejor de cada uno de los experimentos.
